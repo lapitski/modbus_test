@@ -31,11 +31,11 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  String _address = '192.168.0.129';
-  int _port = 5022;
+  String _address = '192.168.8.1';
+  int _port = 502;
   TextEditingController _addressCtrl =
-      TextEditingController(text: '192.168.0.129');
-  TextEditingController _portCtrl = TextEditingController(text: '5022');
+      TextEditingController(text: '192.168.8.1');
+  TextEditingController _portCtrl = TextEditingController(text: '502');
   Uint8List? _slaveIdResponse;
   TextEditingController _registerCtrl = TextEditingController(text: '20');
   int _register = 20;
@@ -53,10 +53,20 @@ class _MyHomePageState extends State<MyHomePage> {
     );
 
     try {
-      await _client!.connect();
-      _isConnected = true;
-      _toggleIsConnecting();
+      bool error = false;
+      await _client!.connect().timeout(Duration(seconds: 10), onTimeout: () {
+        error = true;
+        _client!.close();
+        _toggleIsConnecting();
+        _showInfo('Error on connection');
+      });
+      if (!error) {
+        _isConnected = true;
+        _toggleIsConnecting();
+      }
     } catch (e) {
+      _toggleIsConnecting();
+      _showInfo(e.toString());
       print(e);
     }
   }
@@ -127,6 +137,9 @@ class _MyHomePageState extends State<MyHomePage> {
                       height: 10.0,
                     ),
                     const Divider(),
+                    const SizedBox(
+                      height: 10.0,
+                    ),
                     const Text('Read holding registers'),
                     TextField(
                       keyboardType: TextInputType.number,
@@ -145,5 +158,9 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
             ),
     );
+  }
+
+  _showInfo(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 }
