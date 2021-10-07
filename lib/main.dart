@@ -9,7 +9,6 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({Key? key}) : super(key: key);
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -17,7 +16,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const MyHomePage(title: 'Flutter Modbus'),
     );
   }
 }
@@ -32,18 +31,21 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  String _address = '192.168.8.1';
-  int _port = 502;
+  String _address = '192.168.0.129';
+  int _port = 5022;
   TextEditingController _addressCtrl =
-      TextEditingController(text: '192.168.8.1');
-  TextEditingController _portCtrl = TextEditingController(text: '502');
+      TextEditingController(text: '192.168.0.129');
+  TextEditingController _portCtrl = TextEditingController(text: '5022');
   Uint8List? _slaveIdResponse;
   TextEditingController _registerCtrl = TextEditingController(text: '20');
   int _register = 20;
   modbus.ModbusClient? _client;
   var _readResp;
+  bool _isConnected = false;
+  bool _isConnecting = false;
 
   connect() async {
+    _toggleIsConnecting();
     _client = modbus.createTcpClient(
       _address,
       port: _port,
@@ -52,12 +54,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
     try {
       await _client!.connect();
-
-      var slaveIdResponse = await _client!.reportSlaveId();
-
-      setState(() {
-        _slaveIdResponse = slaveIdResponse;
-      });
+      _isConnected = true;
+      _toggleIsConnecting();
     } catch (e) {
       print(e);
     }
@@ -67,8 +65,14 @@ class _MyHomePageState extends State<MyHomePage> {
     _client!.close();
     setState(() {
       _client = null;
-      _slaveIdResponse = null;
+      _isConnected = false;
       _readResp = null;
+    });
+  }
+
+  _toggleIsConnecting() {
+    setState(() {
+      _isConnecting = !_isConnecting;
     });
   }
 
@@ -85,58 +89,61 @@ class _MyHomePageState extends State<MyHomePage> {
       appBar: AppBar(
         title: Text(widget.title),
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              TextField(
-                keyboardType: TextInputType.number,
-                controller: _addressCtrl,
-                onChanged: (val) {
-                  _address = val;
-                },
-              ),
-              TextField(
-                keyboardType: TextInputType.number,
-                controller: _portCtrl,
-                onChanged: (val) {
-                  _port = int.parse(val);
-                },
-              ),
-              ElevatedButton(
-                onPressed: connect,
-                child: const Text('Connect'),
-              ),
-              if (_slaveIdResponse != null)
-                ElevatedButton(
-                  onPressed: connect,
-                  child: const Text('Disconnect'),
+      body: _isConnecting
+          ? const Center(
+              child: CircularProgressIndicator(),
+            )
+          : Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    TextField(
+                      keyboardType: TextInputType.number,
+                      controller: _addressCtrl,
+                      onChanged: (val) {
+                        _address = val;
+                      },
+                    ),
+                    TextField(
+                      keyboardType: TextInputType.number,
+                      controller: _portCtrl,
+                      onChanged: (val) {
+                        _port = int.parse(val);
+                      },
+                    ),
+                    ElevatedButton(
+                      onPressed: connect,
+                      child: const Text('Connect'),
+                    ),
+                    if (_isConnected)
+                      ElevatedButton(
+                        onPressed: disconnect,
+                        child: const Text('Disconnect'),
+                      ),
+                    if (_isConnected) const Text('Connected'),
+                    const SizedBox(
+                      height: 10.0,
+                    ),
+                    const Divider(),
+                    const Text('Read holding registers'),
+                    TextField(
+                      keyboardType: TextInputType.number,
+                      controller: _registerCtrl,
+                      onChanged: (val) {
+                        _register = int.parse(val);
+                      },
+                    ),
+                    ElevatedButton(
+                      onPressed: _isConnected ? read : null,
+                      child: const Text('Read'),
+                    ),
+                    if (_readResp != null) Text('Responce: $_readResp'),
+                  ],
                 ),
-              if (_slaveIdResponse != null)
-                Text('SlaveIdResponse:$_slaveIdResponse'),
-              const SizedBox(
-                height: 10.0,
               ),
-              const Divider(),
-              const Text('Read holding registers'),
-              TextField(
-                keyboardType: TextInputType.number,
-                controller: _registerCtrl,
-                onChanged: (val) {
-                  _register = int.parse(val);
-                },
-              ),
-              ElevatedButton(
-                onPressed: _readResp != null ? read : null,
-                child: const Text('Read'),
-              ),
-              if (_readResp != null) Text('Responce: $_readResp'),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 }
